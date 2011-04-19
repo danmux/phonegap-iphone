@@ -91,8 +91,9 @@
 			i = 90;
 			break;
 	}
-	
-	NSString* jsCallback = [NSString stringWithFormat:@"window.__defineGetter__('orientation',function(){return %d;});window.onorientationchange();",i];
+
+	NSString* jsCallback = [NSString stringWithFormat:@"window.__defineGetter__('orientation',function(){return %d;});var e = document.createEvent('Events'); e.initEvent('orientationchange', true, false); document.dispatchEvent(e); ",i];
+    
 	[webView stringByEvaluatingJavaScriptFromString:jsCallback];
 	 
 }
