@@ -18,7 +18,7 @@ Notification = function() {
 Notification.prototype.alert = function(message, completeCallback, title, buttonLabel) {
     var _title = (title || "Alert");
     var _buttonLabel = (buttonLabel || "OK");
-    PhoneGap.exec(completeCallback, null, "Notification", "alert", [message,{ "title": _title, "buttonLabel": _buttonLabel}]);
+    PhoneGap.exec(completeCallback, null, "com.phonegap.notification", "alert", [message,{ "title": _title, "buttonLabel": _buttonLabel}]);
 };
 
 /**
@@ -35,28 +35,7 @@ Notification.prototype.confirm = function(message, resultCallback, title, button
     var _buttonLabels = (buttonLabels || "OK,Cancel");
     this.alert(message, resultCallback, _title, _buttonLabels);
 };
-/**
- * Start spinning the activity indicator on the statusbar
- */
-Notification.prototype.activityStart = function() {
-    PhoneGap.exec(null, null, "Notification", "activityStart", []);
-};
 
-/**
- * Stop spinning the activity indicator on the statusbar, if it's currently spinning
- */
-Notification.prototype.activityStop = function() {
-    PhoneGap.exec(null, null, "Notification", "activityStop", []);
-};
-
-// iPhone only
-Notification.prototype.loadingStart = function(options) {
-    PhoneGap.exec(null, null, "Notification","loadingStart", [options]);
-};
-// iPhone only
-Notification.prototype.loadingStop = function() {
-    PhoneGap.exec(null, null, "Notification","loadingStop", []);
-};
 /**
  * Causes the device to blink a status LED.
  * @param {Integer} count The number of blinks.
@@ -67,7 +46,7 @@ Notification.prototype.blink = function(count, colour) {
 };
 
 Notification.prototype.vibrate = function(mills) {
-	PhoneGap.exec(null, null, "Notification", "vibrate", []);
+	PhoneGap.exec(null, null, "com.phonegap.notification", "vibrate", []);
 };
 
 Notification.prototype.beep = function(count, volume) {

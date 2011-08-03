@@ -8,10 +8,9 @@
 
 #import <UIKit/UIKit.h>
 #import <CoreLocation/CoreLocation.h>
-#import "PhoneGapCommand.h"
+#import "PGPlugin.h"
 
-@interface Location : PhoneGapCommand <CLLocationManagerDelegate> {
-	CLLocationManager *locationManager;
+@interface PGLocation : PGPlugin <CLLocationManagerDelegate> {
     BOOL              __locationStarted;
     BOOL              __headingStarted;
 }
@@ -35,8 +34,6 @@
 
 - (BOOL) isLocationServicesEnabled;
 
-#ifdef __IPHONE_3_0
-
 - (void)startHeading:(NSMutableArray*)arguments
 			withDict:(NSMutableDictionary*)options;
 
@@ -47,7 +44,5 @@
 	   didUpdateHeading:(CLHeading *)heading;
 
 - (BOOL)locationManagerShouldDisplayHeadingCalibration:(CLLocationManager *)manager;
-
-#endif
 
 @end

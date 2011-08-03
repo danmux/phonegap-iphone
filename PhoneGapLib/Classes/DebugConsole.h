@@ -8,9 +8,10 @@
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
-#import "PhoneGapCommand.h"
+#import "PGPlugin.h"
 
-@interface DebugConsole : PhoneGapCommand {
+
+@interface PGDebugConsole : PGPlugin {
 }
 
 - (void)log:(NSMutableArray*)arguments withDict:(NSMutableDictionary*)options;

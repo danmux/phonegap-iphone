@@ -9,68 +9,63 @@
 #import <UIKit/UIKit.h>
 #import <CoreLocation/CoreLocation.h>
 #import <UIKit/UINavigationController.h>
-#import "JSON/JSON.h"
+#import "JSON.h"
 
 #import "Location.h"
 #import "Sound.h"
 
 
 #import "DebugConsole.h"
-//#import "Image.h"
+
 
 @class InvokedUrlCommand;
 @class PhoneGapViewController;
 @class Sound;
 @class Contacts;
 @class Console;
-//@class Image;
 
-@interface PhoneGapDelegate : NSObject <
-    UIApplicationDelegate, 
-    UIWebViewDelegate, 
-    UIAccelerometerDelegate,
-    UINavigationControllerDelegate
-  >
+
+@interface PhoneGapDelegate : NSObject <UIApplicationDelegate, UIWebViewDelegate>
 {
-	
-	IBOutlet UIWindow *window;
-	IBOutlet UIWebView *webView;
-	IBOutlet PhoneGapViewController *viewController;
-	
-	IBOutlet UIImageView *imageView;
-	IBOutlet UIActivityIndicatorView *activityView;
-
-	NSURLConnection *conn;				// added by urbian
-	NSMutableData *receivedData;		// added by urbian	
-
-    UIInterfaceOrientation orientationType;
-    NSDictionary *settings;
-    NSMutableDictionary *commandObjects;
-    NSURL *invokedURL;
 }
 
-@property (nonatomic, retain) UIWindow *window;
-@property (nonatomic, retain) UIWebView *webView;
-@property (nonatomic, retain) PhoneGapViewController *viewController;
-@property (nonatomic, retain) UIActivityIndicatorView *activityView;
-@property (nonatomic, retain) NSMutableDictionary *commandObjects;
+@property (nonatomic, retain) IBOutlet UIWindow *window;
+@property (nonatomic, retain) IBOutlet UIWebView *webView;
+@property (nonatomic, retain) IBOutlet PhoneGapViewController *viewController;
+@property (nonatomic, retain) IBOutlet UIActivityIndicatorView *activityView;
+@property (nonatomic, retain) UIImageView *imageView;
+@property (nonatomic, retain) NSMutableDictionary *pluginObjects;
+@property (nonatomic, retain) NSDictionary *pluginsMap;
 @property (nonatomic, retain) NSDictionary *settings;
 @property (nonatomic, retain) NSURL *invokedURL;
-
-- (id) getCommandInstance:(NSString*)className;
-- (void) javascriptAlert:(NSString*)text;
-- (BOOL) execute:(InvokedUrlCommand*)command;
-- (NSString*) appURLScheme;
-- (NSDictionary*) deviceProperties;
-- (void)applicationWillTerminate:(UIApplication *)application;
-
+@property (assign) BOOL loadFromString;
+@property (assign) UIInterfaceOrientation orientationType;
+@property (nonatomic, retain) NSString *sessionKey;
 
 + (NSDictionary*)getBundlePlist:(NSString *)plistName;
 + (NSString*) wwwFolderName;
 + (NSString*) pathForResource:(NSString*)resourcepath;
 + (NSString*) phoneGapVersion;
 + (NSString*) applicationDocumentsDirectory;
-+ (NSString*) tmpFolderName;
 + (NSString*) startPage;
 
+
+- (id) getCommandInstance:(NSString*)pluginName;
+- (void) javascriptAlert:(NSString*)text;
+- (BOOL) execute:(InvokedUrlCommand*)command;
+- (NSString*) appURLScheme;
+- (NSDictionary*) deviceProperties;
+
+- (void)applicationDidEnterBackground:(UIApplication *)application;
+- (void)applicationWillEnterForeground:(UIApplication *)application;
+- (void)applicationWillResignActive:(UIApplication *)application;
+- (void)applicationWillTerminate:(UIApplication *)application;
+
 @end
+
+@interface NSDictionary (LowercaseKeys)
+
+- (NSDictionary*) dictionaryWithLowercaseKeys;
+
+@end
+

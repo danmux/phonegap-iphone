@@ -1,16 +1,6 @@
 if (!PhoneGap.hasResource("camera")) {
 	PhoneGap.addResource("camera");
 	
-// adding in preparation to switch to Media capture API
-CaptureError = function() {
-   this.code = null;
-}
-
-// capture error codes
-CaptureError.CAPTURE_INTERNAL_ERR = 0;
-CaptureError.CAPTURE_APPLICATION_BUSY = 1;
-CaptureError.CAPTURE_INVALID_ARGUMENT = 2;
-CaptureError.CAPTURE_NO_MEDIA_FILES = 3;
 
 /**
  * This class provides access to the device camera.
@@ -19,9 +9,18 @@ CaptureError.CAPTURE_NO_MEDIA_FILES = 3;
 Camera = function() {
 	
 }
-
 /**
- * Format of image that returned from getPicture.
+ *  Available Camera Options
+ *  {boolean} allowEdit - true to allow editing image, default = false
+ *	{number} quality 0-100 (low to high) default =  100
+ *  {Camera.DestinationType} destinationType default = DATA_URL
+ *	{Camera.PictureSourceType} sourceType default = CAMERA
+ *	{number} targetWidth - width in pixels to scale image default = 0 (no scaling)
+ *  {number} targetHeight - height in pixels to scale image default = 0 (no scaling)
+ *  {Camera.EncodingType} - encodingType default = JPEG
+ */
+/**
+ * Format of image that is returned from getPicture.
  *
  * Example: navigator.camera.getPicture(success, fail,
  *              { quality: 80,
@@ -30,7 +29,7 @@ Camera = function() {
  */
 Camera.DestinationType = {
     DATA_URL: 0,                // Return base64 encoded string
-    FILE_URI: 1                 // Return file uri (content://media/external/images/media/2 for Android)
+    FILE_URI: 1                 // Return file uri 
 };
 Camera.prototype.DestinationType = Camera.DestinationType;
 
@@ -48,6 +47,21 @@ Camera.PictureSourceType = {
     SAVEDPHOTOALBUM : 2         // Choose image from picture library 
 };
 Camera.prototype.PictureSourceType = Camera.PictureSourceType;
+
+/** 
+ * Encoding of image returned from getPicture. 
+ * 
+ * Example: navigator.camera.getPicture(success, fail, 
+ *              { quality: 80, 
+ *                destinationType: Camera.DestinationType.DATA_URL, 
+ *                sourceType: Camera.PictureSourceType.CAMERA, 
+ *                encodingType: Camera.EncodingType.PNG}) 
+ */ 
+Camera.EncodingType = { 
+	JPEG: 0,                    // Return JPEG encoded image 
+	PNG: 1                      // Return PNG encoded image 
+};
+Camera.prototype.EncodingType = Camera.EncodingType;
 
 /**
  * Gets a picture from source defined by "options.sourceType", and returns the
@@ -72,7 +86,7 @@ Camera.prototype.getPicture = function(successCallback, errorCallback, options) 
         return;
     }
 	
-	PhoneGap.exec(successCallback, errorCallback, "Camera","getPicture",[options]);
+	PhoneGap.exec(successCallback, errorCallback, "com.phonegap.camera","getPicture",[options]);
 };
 
 
@@ -81,3 +95,4 @@ PhoneGap.addConstructor(function() {
     if (typeof navigator.camera == "undefined") navigator.camera = new Camera();
 });
 };
+

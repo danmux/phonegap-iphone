@@ -14,7 +14,7 @@
 #import <MobileCoreServices/MobileCoreServices.h>
 
 
-@implementation File
+@implementation PGFile
 
 @synthesize appDocsPath, appLibraryPath, appTempPath, persistentPath, temporaryPath, userHasAllowed;
 
@@ -22,7 +22,7 @@
 
 -(id)initWithWebView:(UIWebView *)theWebView
 {
-	self = (File*)[super initWithWebView:theWebView];
+	self = (PGFile*)[super initWithWebView:theWebView];
 	if(self)
 	{
 		// get the documents directory path
@@ -146,7 +146,6 @@
 			[fileSystem setObject:dirEntry forKey:@"root"];
 			result = [PluginResult resultWithStatus: PGCommandStatus_OK messageAsDictionary: fileSystem cast: @"window.localFileSystem._castFS"];
 			jsString = [result toSuccessCallbackString:callbackId];
-			//jsCallback = [NSString stringWithFormat:@"window.fileSystem.localFileSystem._requestFileSystemCB(%@);",[fileSystem JSONRepresentation]];
 		}
 	}
 	[self writeJavascript: jsString];
@@ -202,21 +201,23 @@
 {
 	NSString* callbackId = [arguments objectAtIndex:0];
 	NSString* jsString = nil;
-	NSString* inputUri = [arguments objectAtIndex:1];
-	NSString* strUri = [inputUri stringByAddingPercentEscapesUsingEncoding: NSUTF8StringEncoding];
-	NSURL* testUri = [NSURL URLWithString:strUri];  //needs to be encoded when creating NSURL
+    NSString* inputUri = [arguments objectAtIndex:1];
+    // don't know if string is encoded or not so unescape 
+    NSString* cleanUri = [inputUri stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+	// now escape in order to create URL
+    NSString* strUri = [cleanUri stringByAddingPercentEscapesUsingEncoding: NSUTF8StringEncoding];
+	NSURL* testUri = [NSURL URLWithString:strUri];  
 	PluginResult* result = nil;
 	
 	if (!testUri || ![testUri isFileURL]) {
 		// issue ENCODING_ERR
 		result = [PluginResult resultWithStatus: PGCommandStatus_OK messageAsInt: ENCODING_ERR cast: @"window.localFileSystem._castError"];
 		jsString = [result toErrorCallbackString:callbackId];
-		//jsString = [NSString stringWithFormat:@"window.fileSystem.localFileSystem._errorCB(%d)", ENCODING_ERR];
 	} else {
 		NSFileManager* fileMgr = [[NSFileManager alloc] init];
 		NSString* path = [testUri path];
 		//NSLog(@"url path: %@", path);
-		BOOL	isDir;
+		BOOL	isDir = NO;
 		// see if exists and is file or dir
 		BOOL bExists = [fileMgr fileExistsAtPath:path isDirectory: &isDir];
 		if (bExists) {
@@ -251,9 +252,6 @@
 			
 		}
 
-		// use NSString URL access methods - NSURL methods are more efficient but only avail as of iOS 4.0 
-		//NSArray* parts = [strUri pathComponents];
-		//NSLog(@"file uri parts %@", [parts componentsJoinedByString:@" : "]);
 		[fileMgr release];
 	}
 	if (jsString != nil){
@@ -392,7 +390,6 @@
 		// create error callback
 		result = [PluginResult resultWithStatus: PGCommandStatus_OK messageAsInt: errorCode cast: @"window.localFileSystem._castError"];
 		jsString = [result toErrorCallbackString:callbackId];
-		//jsCallback = [NSString stringWithFormat:@"navigator.fileMgr._entryErrorCB(%d)", errorCode];
 	}
 	
 	
@@ -619,6 +616,35 @@
 {
 	[self doCopyMove:arguments withDict:options isCopy:NO];
 }
+/**
+ * Helpfer function to check to see if the user attempted to copy an entry into its parent without changing its name, 
+ * or attempted to copy a directory into a directory that it contains directly or indirectly.
+ * 
+ * IN: 
+ *  NSString* srcDir
+ *  NSString* destinationDir
+ * OUT:
+ *  YES copy/ move is allows
+ *  NO move is onto itself
+ */	
+-(BOOL) canCopyMoveSrc: (NSString*) src ToDestination: (NSString*) dest
+{
+    // This weird test is to determine if we are copying or moving a directory into itself.  
+    // Copy /Documents/myDir to /Documents/myDir-backup is okay but
+    // Copy /Documents/myDir to /Documents/myDir/backup not okay
+    BOOL copyOK = YES;
+    NSRange range = [dest rangeOfString:src];
+    
+    if (range.location != NSNotFound) {
+        NSRange testRange = {range.length-1, ([dest length] - range.length)};
+        NSRange resultRange = [dest rangeOfString: @"/" options: 0 range: testRange];
+        if (resultRange.location != NSNotFound){
+            copyOK = NO;
+        }
+    }
+    return copyOK;
+    
+}
 /* Copy/move a file or directory to a new location
  * IN: 
  * NSArray* arguments
@@ -681,10 +707,10 @@
 				NSError* error = nil;
 				BOOL bSuccess = NO;
 				if (bCopy){
-					if([newFullPath hasPrefix:srcFullPath]) {
-						// can't copy into self
+					if (bSrcIsDir && ![self canCopyMoveSrc: srcFullPath ToDestination: newFullPath]/*[newFullPath hasPrefix:srcFullPath]*/) {
+						// can't copy dir into self
 						errCode = INVALID_MODIFICATION_ERR;
-					}else if (bNewExists) {
+					} else if (bNewExists) {
 						// the full destination should NOT already exist if a copy
 						errCode = PATH_EXISTS_ERR;
 					}  else {
@@ -697,7 +723,7 @@
 					if (!bSrcIsDir && (bNewExists && bNewIsDir)){
 						// can't move a file to directory
 						errCode = INVALID_MODIFICATION_ERR;
-					} else if (bSrcIsDir && [newFullPath hasPrefix:srcFullPath]){
+					} else if (bSrcIsDir && ![self canCopyMoveSrc: srcFullPath ToDestination: newFullPath] ) { //[newFullPath hasPrefix:srcFullPath]){
 						// can't move a dir into itself
 						errCode = INVALID_MODIFICATION_ERR;	
 					} else if (bNewExists) {
@@ -880,24 +906,29 @@
 	PluginResult* result = nil;
 	NSString* jsString = nil;
 	
-	NSString *filePath = argPath; //[ self getFullPath: argPath];
+	NSFileHandle* file = [ NSFileHandle fileHandleForReadingAtPath:argPath];
 	
-	if(!filePath){
+	if(!file){
 		// invalid path entry
 		result = [PluginResult resultWithStatus:PGCommandStatus_OK messageAsInt: NOT_FOUND_ERR cast: @"window.localFileSystem._castError"];
 		jsString = [result toErrorCallbackString:callbackId];
 	} else {
-		NSFileHandle* file = [ NSFileHandle fileHandleForReadingAtPath:filePath];
-		
 		NSData* readData = [ file readDataToEndOfFile];
 		
 		[file closeFile];
-		
-		NSString* pNStrBuff = [[NSString alloc] initWithBytes: [readData bytes] length: [readData length] encoding: NSUTF8StringEncoding];
-		
-		result = [PluginResult resultWithStatus: PGCommandStatus_OK messageAsString: [ pNStrBuff stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] ];
-		jsString = [result toSuccessCallbackString:callbackId];
-		[ pNStrBuff release ];
+        NSString* pNStrBuff = nil;
+		if (readData) {
+            pNStrBuff = [[NSString alloc] initWithBytes: [readData bytes] length: [readData length] encoding: NSUTF8StringEncoding];
+        } else {
+            // return empty string if no data
+            pNStrBuff = [[NSString alloc] initWithString: @""];
+        }
+        
+        
+        result = [PluginResult resultWithStatus: PGCommandStatus_OK messageAsString: [ pNStrBuff stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] ];
+        jsString = [result toSuccessCallbackString:callbackId];
+        [ pNStrBuff release ];
+        
 		
 	}
 	if (jsString){
@@ -972,7 +1003,14 @@
 			if (mimeType) {
 				[mimeType autorelease];
 				//NSLog(@"mime type: %@", mimeType);
-			}
+			} else {
+                // special case for m4a
+                if ([(NSString*)typeId rangeOfString: @"m4a-audio"].location != NSNotFound){
+                    mimeType = @"audio/mp4";
+                } else if ([[fullPath pathExtension] rangeOfString:@"wav"].location != NSNotFound){
+                    mimeType = @"audio/wav";
+                }
+            }
 			CFRelease(typeId);
 		}
 	}
@@ -1009,26 +1047,8 @@
 	}
 	return newPos;
 } 
-/* writeAsText  - deprecated
- * IN:
- * NSArray* arguments
- *  0 - NSString* callbackId
- *  1 - NSString* file path to write to
- *  2 - NSString* data to write
- *  3 - NSNumber* 1 to append to file, 0 to overwrite
- */
-- (void) writeAsText:(NSMutableArray*)arguments withDict:(NSMutableDictionary*)options
-{
-	NSString* callbackId = [arguments objectAtIndex:0];
-	NSString* argPath = [arguments objectAtIndex:1];
-	NSString* argData = [arguments objectAtIndex:2];
-	BOOL bAppend = [[arguments objectAtIndex:3] boolValue];
-	
-	//[self writeToFile:[self getFullPath:argPath] withData:argData append: bAppend callback: callbackId];
-	[self writeToFile:argPath withData:argData append: bAppend callback: callbackId];
-	
-}
-/* writeAsText  - deprecated
+
+/* write
  * IN:
  * NSArray* arguments
  *  0 - NSString* callbackId
@@ -1055,7 +1075,7 @@
 	NSString* jsString = nil;
 	FileError errCode = INVALID_MODIFICATION_ERR; 
 	int bytesWritten = 0;
-	NSData* encData = [ data dataUsingEncoding:NSUTF8StringEncoding];
+	NSData* encData = [ data dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:YES];
 	if (filePath) {
 		NSOutputStream* fileStream = [NSOutputStream outputStreamToFileAtPath:filePath append:shouldAppend ];
 		if (fileStream) {

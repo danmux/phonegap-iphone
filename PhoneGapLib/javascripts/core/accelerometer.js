@@ -55,7 +55,7 @@ Accelerometer.prototype.watchAcceleration = function(successCallback, errorCallb
 	var updatedOptions = {
 		desiredFrequency:frequency 
 	}
-	PhoneGap.exec("Accelerometer.start",options);
+	PhoneGap.exec(null, null, "com.phonegap.accelerometer", "start", [options]);
 
 	return setInterval(function() {
 		navigator.accelerometer.getCurrentAcceleration(successCallback, errorCallback, options);
@@ -67,11 +67,94 @@ Accelerometer.prototype.watchAcceleration = function(successCallback, errorCallb
  * @param {String} watchId The ID of the watch returned from #watchAcceleration.
  */
 Accelerometer.prototype.clearWatch = function(watchId) {
-	PhoneGap.exec("Accelerometer.stop");
+	PhoneGap.exec(null, null, "com.phonegap.accelerometer", "stop", []);
 	clearInterval(watchId);
 };
 
-PhoneGap.addConstructor(function() {
-    if (typeof navigator.accelerometer == "undefined") navigator.accelerometer = new Accelerometer();
-});
+Accelerometer.install = function()
+{
+    if (typeof navigator.accelerometer == "undefined") {
+		navigator.accelerometer = new Accelerometer();
+	}
+};
+
+Accelerometer.installDeviceMotionHandler = function()
+{
+	if (!(window.DeviceMotionEvent == undefined)) {
+		// supported natively, so we don't have to add support
+		return;
+	}	
+	
+	var self = this;
+	var devicemotionEvent = 'devicemotion';
+	self.deviceMotionWatchId = null;
+	self.deviceMotionListenerCount = 0;
+	self.deviceMotionLastEventTimestamp = 0;
+	
+	// backup original `window.addEventListener`, `window.removeEventListener`
+    var _addEventListener = window.addEventListener;
+    var _removeEventListener = window.removeEventListener;
+													
+	var windowDispatchAvailable = !(window.dispatchEvent === undefined); // undefined in iOS 3.x
+													
+	var accelWin = function(acceleration) {
+		var evt = document.createEvent('Events');
+	    evt.initEvent(devicemotionEvent);
+	
+		evt.acceleration = null; // not all devices have gyroscope, don't care for now if we actually have it.
+		evt.rotationRate = null; // not all devices have gyroscope, don't care for now if we actually have it:
+		evt.accelerationIncludingGravity = acceleration; // accelerometer, all iOS devices have it
+		
+		var currentTime = new Date().getTime();
+		evt.interval =  (self.deviceMotionLastEventTimestamp == 0) ? 0 : (currentTime - self.deviceMotionLastEventTimestamp);
+		self.deviceMotionLastEventTimestamp = currentTime;
+		
+		if (windowDispatchAvailable) {
+			window.dispatchEvent(evt);
+		} else {
+			document.dispatchEvent(evt);
+		}
+	};
+	
+	var accelFail = function() {
+		
+	};
+													
+    // override `window.addEventListener`
+    window.addEventListener = function() {
+        if (arguments[0] === devicemotionEvent) {
+            ++(self.deviceMotionListenerCount);
+			if (self.deviceMotionListenerCount == 1) { // start
+				self.deviceMotionWatchId = navigator.accelerometer.watchAcceleration(accelWin, accelFail, { frequency:500});
+			}
+		} 
+													
+		if (!windowDispatchAvailable) {
+			return document.addEventListener.apply(this, arguments);
+		} else {
+			return _addEventListener.apply(this, arguments);
+		}
+    };	
+
+    // override `window.removeEventListener'
+    window.removeEventListener = function() {
+        if (arguments[0] === devicemotionEvent) {
+            --(self.deviceMotionListenerCount);
+			if (self.deviceMotionListenerCount == 0) { // stop
+				navigator.accelerometer.clearWatch(self.deviceMotionWatchId);
+			}
+		} 
+		
+		if (!windowDispatchAvailable) {
+			return document.removeEventListener.apply(this, arguments);
+		} else {
+			return _removeEventListener.apply(this, arguments);
+		}
+    };	
+};
+
+
+PhoneGap.addConstructor(Accelerometer.install);
+PhoneGap.addConstructor(Accelerometer.installDeviceMotionHandler);
+
 };

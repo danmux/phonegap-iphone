@@ -4,14 +4,21 @@
  * 
  * Copyright (c) 2005-2011, Nitobi Software Inc.
  * Copyright (c) 2011, Matt Kane
+ * Copyright (c) 2011, IBM Corporation
  */
 
 
 #import <Foundation/Foundation.h>
-#import "PhoneGapCommand.h"
+#import "PGPlugin.h"
 
+enum FileTransferError {
+	FILE_NOT_FOUND_ERR = 1,
+    INVALID_URL_ERR = 2,
+    CONNECTION_ERR = 3
+};
+typedef int FileTransferError;
 
-@interface FileTransfer : PhoneGapCommand {
+@interface PGFileTransfer : PGPlugin {
     
 }
 - (void) upload:(NSMutableArray*)arguments withDict:(NSMutableDictionary*)options;
@@ -20,12 +27,16 @@
 
 
 @interface FileTransferDelegate : NSObject {
-	FileTransfer* command;
+	PGFileTransfer* command;
 	NSString* callbackId;
+    NSInteger bytesWritten;
+    
 }
 
 @property (nonatomic, retain) NSMutableData* responseData;
-@property (nonatomic, retain) FileTransfer* command;
+@property (nonatomic, retain) PGFileTransfer* command;
 @property (nonatomic, retain) NSString* callbackId;
+@property NSInteger bytesWritten;
+
 
 @end;

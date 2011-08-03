@@ -8,7 +8,7 @@
 
 #import <Foundation/Foundation.h>
 
-enum PGCommandStatus {
+typedef enum {
 	PGCommandStatus_NO_RESULT = 0,
 	PGCommandStatus_OK,
 	PGCommandStatus_CLASS_NOT_FOUND_EXCEPTION,
@@ -19,9 +19,8 @@ enum PGCommandStatus {
 	PGCommandStatus_INVALID_ACTION,
 	PGCommandStatus_JSON_EXCEPTION,
 	PGCommandStatus_ERROR
-};
-typedef int PGCommandStatus;
-
+} PGCommandStatus;
+	
 @interface PluginResult : NSObject {
 	NSNumber* status;
 	id message;
@@ -41,12 +40,14 @@ typedef int PGCommandStatus;
 +(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageAsString: (NSString*) theMessage;
 +(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageAsArray: (NSArray*) theMessage;
 +(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageAsInt: (int) theMessage;
++(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageAsDouble: (double) theMessage;
 +(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageAsDictionary: (NSDictionary*) theMessage;
 +(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageAsString: (NSString*) theMessage cast: (NSString*) theCast;
 +(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageAsArray: (NSArray*) theMessage cast: (NSString*) theCast;
 +(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageAsInt: (int) theMessage cast: (NSString*) theCast;
++(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageAsDouble: (double) theMessage cast: (NSString*) theCast;
 +(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageAsDictionary: (NSDictionary*) theMessage cast: (NSString*) theCast;
-
++(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageToErrorObject: (int) errorCode;
 
 
  

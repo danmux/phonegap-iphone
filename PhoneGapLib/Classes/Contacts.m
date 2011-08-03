@@ -34,7 +34,7 @@
 @end
 
 
-@implementation Contacts
+@implementation PGContacts
 
 // no longer used since code gets AddressBook for each operation. 
 // If address book changes during save or remove operation, may get error but not much we can do about it
@@ -47,9 +47,9 @@
 	[contacts addressBookDirty];
 }*/
 
--(PhoneGapCommand*) initWithWebView:(UIWebView*)theWebView
+-(PGPlugin*) initWithWebView:(UIWebView*)theWebView
 {
-    self = (Contacts*)[super initWithWebView:(UIWebView*)theWebView];
+    self = (PGContacts*)[super initWithWebView:(UIWebView*)theWebView];
     /*if (self) {
 		addressBook = ABAddressBookCreate();
 		ABAddressBookRegisterExternalChangeCallback(addressBook, addressBookChanged, self);
@@ -57,6 +57,16 @@
 	
 	return self;
 }
+
+
+// overridden to clean up Contact statics
+-(void)onAppTerminate
+{
+	//NSLog(@"Contacts::onAppTerminate");
+	[PGContact releaseDefaults];
+}
+
+
 // iPhone only method to create a new contact through the GUI
 - (void) newContact:(NSMutableArray*)arguments withDict:(NSMutableDictionary*)options;
 {	
@@ -71,9 +81,6 @@
 	UINavigationController *navController = [[[UINavigationController alloc] initWithRootViewController:npController] autorelease];
 	[[super appViewController] presentModalViewController:navController animated: YES];
  
-
-			
-		
 }
 
 - (void) newPersonViewController:(ABNewPersonViewController*)newPersonViewController didCompleteWithNewPerson:(ABRecordRef)person
@@ -103,65 +110,40 @@
 
 		
 	
-	//bool allowsEditing = [options isKindOfClass:[NSNull class]] ? false : [options existsValue:@"true" forKey:@"allowsEditing"];
+	bool bEdit = [options isKindOfClass:[NSNull class]] ? false : [options existsValue:@"true" forKey:@"allowsEditing"];
 	ABAddressBookRef addrBook = ABAddressBookCreate();	
 	ABRecordRef rec = ABAddressBookGetPersonWithRecordID(addrBook, recordID);
 	if (rec) {
 		ABPersonViewController* personController = [[[ABPersonViewController alloc] init] autorelease];
 		personController.displayedPerson = rec;
 		personController.personViewDelegate = self;
-		personController.allowsEditing = NO; //allowsEditing currently not supported
+		personController.allowsEditing = NO;
 		
-		UIBarButtonItem* doneButton = [[UIBarButtonItem alloc]
+		UIBarButtonItem* doneButton = [[[UIBarButtonItem alloc]
 									   initWithBarButtonSystemItem:UIBarButtonSystemItemDone
 									   target: self
-									   action: @selector(dismissModalView:)];
+									   action: @selector(dismissModalView:)] autorelease];
 		
 		UINavigationController *navController = [[[UINavigationController alloc] initWithRootViewController:personController] autorelease];
-		[[super appViewController] presentModalViewController:navController animated: YES];
+		[self.appViewController presentModalViewController:navController animated: YES];
 		
 		// this needs to be AFTER presentModal, if not it does not show up (iOS 4 regression: workaround)
 		personController.navigationItem.rightBarButtonItem = doneButton;
-		
-		[doneButton release];												
-		CFRelease(rec);
-		
-	  //Commented out code is various attempts to get editing
-		// navigation working properly
-		
-		/*CGFloat width = webView.frame.size.width;
-		UINavigationBar *navBar = [[UINavigationBar alloc] initWithFrame:
-								   CGRectMake(0,0,width,52)];
-		navBar.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-		 */
-		//[[super appNavController] pushViewController:personController animated: YES];
-		
-		/*ContactsPicker* pickerController = [[[ContactsPicker alloc] init] autorelease];
-		pickerController.peoplePickerDelegate = self;
-		*/
-		//UINavigationController *navController = [[[UINavigationController alloc] initWithRootViewController:personController] autorelease];
-		//UINavigationBar* navBar = navController.navigationBar;
-		//NSLog(@"isNavBar == nil %d", (navBar == nil));
-		//[navBar setNavigationBarHidden: NO animated: NO];
-		
-		//NSArray* navArray = [NSArray arrayWithObjects:pickerController, navController, nil];
-		//[navController setViewControllers: navArray animated: YES];
-		//[navController pushViewController:personController animated:NO];
-		
-	
-	
-		//[navBar pushNavigationItem: doneButton animated:YES];
-		//UINavigationController *navController = [[[UINavigationController alloc] initWithRootViewController:personController] autorelease];
-		//[navController pushViewController:personController animated:YES];
-		
-		
-		//personController.navigationItem.rightBarButtonItem = [navController editButtonItem]; 
-		
+
+		if (bEdit) {
+            // create the editing controller and push it onto the stack
+            ABPersonViewController* editPersonController = [[[ABPersonViewController alloc] init] autorelease];
+            editPersonController.displayedPerson = rec;
+            editPersonController.personViewDelegate = self;
+            editPersonController.allowsEditing = YES; 
+            [navController pushViewController:editPersonController animated:YES];
+            
+        }
 	} 
 	else 
 	{
 		// no record, return error
-		PluginResult* result = [PluginResult resultWithStatus: PGCommandStatus_OK messageAsInt:  NOT_FOUND_ERROR];
+		PluginResult* result = [PluginResult resultWithStatus: PGCommandStatus_OK messageAsInt:  UNKNOWN_ERROR];
 		[self writeJavascript:[result toErrorCallbackString:callbackId]];
 		
 	}
@@ -170,8 +152,7 @@
 
 - (void) dismissModalView:(id)sender 
 {
-	UIViewController* controller = ([super appViewController]);
-	[controller.modalViewController dismissModalViewControllerAnimated:YES]; 
+	[self.appViewController dismissModalViewControllerAnimated:YES];
 }
 								   
 - (BOOL) personViewController:(ABPersonViewController *)personViewController shouldPerformDefaultActionForPerson:(ABRecordRef)person 
@@ -253,12 +234,8 @@
 
 	addrBook = ABAddressBookCreate();
 	// get the findOptions values
-	BOOL multiple = YES; // default is true
-	//int limit = 1; // default if multiple is FALSE, will be set below if multiple is TRUE
-	double msUpdatedSince = 0;
-	BOOL bCheckDate = NO;
+	BOOL multiple = NO; // default is false
 	NSString* filter = nil;
-	BOOL bIncludeRecord = YES;
 	if (![findOptions isKindOfClass:[NSNull class]]){
 		id value = nil;
 		filter = (NSString*)[findOptions objectForKey:@"filter"];
@@ -268,39 +245,21 @@
 			multiple = [(NSNumber*)value boolValue];
 			//NSLog(@"multiple is: %d", multiple);
 		}
-		/* limit removed from Dec 2010 W3C contacts spec
-		 if (multiple == YES){
-			// we only care about limit if multiple is true
-			value = [findOptions objectForKey:@"limit"];
-			if ([value isKindOfClass:[NSNumber class]]){
-				limit = [(NSNumber*)value intValue];
-				//NSLog(@"limit is: %d", limit);
-			} else {
-				// no limit specified, set it to -1 to get all
-				limit = -1;
-			}
-		}*/
-		// see if there is an updated date
-		id ms = [findOptions valueForKey:@"updatedSince"];
-		if (ms && [ms isKindOfClass:[NSNumber class]]){
-			msUpdatedSince = [ms doubleValue];
-			bCheckDate = YES;
-		}
-		
 	}
 
-	NSDictionary* returnFields = [[Contact class] calcReturnFields: fields];
+	NSDictionary* returnFields = [[PGContact class] calcReturnFields: fields];
 	
 	NSMutableArray* matches = nil;
 	if (!filter || [filter isEqualToString:@""]){ 
-		// get all records - use fields to determine what properties to return
+		// get all records 
 		foundRecords = (NSArray*)ABAddressBookCopyArrayOfAllPeople(addrBook);
 		if (foundRecords && [foundRecords count] > 0){
 			// create Contacts and put into matches array
-			int xferCount = [foundRecords count];
+            // doesn't make sense to ask for all records when multiple == NO but better check
+			int xferCount = multiple == YES ? [foundRecords count] : 1;
 			matches = [NSMutableArray arrayWithCapacity:xferCount];
 			for(int k = 0; k<xferCount; k++){
-				Contact* xferContact = [[[Contact alloc] initFromABRecord:(ABRecordRef)[foundRecords objectAtIndex:k]] autorelease];
+				PGContact* xferContact = [[[PGContact alloc] initFromABRecord:(ABRecordRef)[foundRecords objectAtIndex:k]] autorelease];
 				[matches addObject:xferContact];
 				xferContact = nil;
 				
@@ -312,7 +271,7 @@
 		BOOL bFound = NO;
 		int testCount = [foundRecords count];
 		for(int j=0; j<testCount; j++){
-			Contact* testContact = [[[Contact alloc] initFromABRecord: (ABRecordRef)[foundRecords objectAtIndex:j]] autorelease];
+			PGContact* testContact = [[[PGContact alloc] initFromABRecord: (ABRecordRef)[foundRecords objectAtIndex:j]] autorelease];
 			if (testContact){
 				bFound = [testContact foundValue:filter inFields:returnFields];
 				if(bFound){
@@ -326,48 +285,24 @@
 	NSMutableArray* returnContacts = [NSMutableArray arrayWithCapacity:1];
 	
 	if (matches != nil && [matches count] > 0){
-
 		// convert to JS Contacts format and return in callback
+        // - returnFields  determines what properties to return
 		NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init]; 
-		//int count = (limit > 0 ? MIN(limit,[matches count]) : [matches count]);
 		int count = multiple == YES ? [matches count] : 1;
 		for(int i = 0; i<count; i++){
-			Contact* newContact = [matches objectAtIndex:i];
-			if (bCheckDate) {
-				NSNumber* modDate = [newContact getDateAsNumber:kABPersonModificationDateProperty];
-				if (modDate){
-					double modDateMs = [modDate doubleValue];
-					if(round(modDateMs) < round(msUpdatedSince)){
-						bIncludeRecord = NO;
-					} else {
-						bIncludeRecord = YES;
-					}
-
-				}
-			}
-			if(bIncludeRecord){
-				NSDictionary* aContact = [newContact toDictionary: returnFields];
-				NSString* contactStr = [aContact JSONRepresentation];
-				[returnContacts addObject:contactStr];
-			}
+			PGContact* newContact = [matches objectAtIndex:i];
+			NSDictionary* aContact = [newContact toDictionary: returnFields];
+			NSString* contactStr = [aContact JSONRepresentation];
+			[returnContacts addObject:contactStr];
 		}
 		[pool release];
-		
-		
 	}
 	PluginResult* result = nil;
-	if ([returnContacts count] == 0){
-		// return error
-		result = [PluginResult resultWithStatus:PGCommandStatus_ERROR messageAsInt: NOT_FOUND_ERROR cast: @"navigator.service.contacts._errCallback"];
-		jsString = [result toErrorCallbackString:callbackId];
-		//jsString = [NSString stringWithFormat:@"%@(%d);", @"navigator.service.contacts._errCallback", NOT_FOUND_ERROR];
-	}else {
-		// return found contacts
-		result = [PluginResult resultWithStatus:PGCommandStatus_OK messageAsArray: returnContacts  cast: @"navigator.service.contacts._findCallback"];
-		jsString = [result toSuccessCallbackString:callbackId];
-		NSLog(@"findCallback string: %@", jsString);
-		//jsString = [NSString stringWithFormat: @"%@([%@]);", @"navigator.service.contacts._findCallback", [returnContacts componentsJoinedByString:@","]];
-	}
+    // return found contacts (array is empty if no contacts found)
+    result = [PluginResult resultWithStatus:PGCommandStatus_OK messageAsArray: returnContacts  cast: @"navigator.contacts._findCallback"];
+    jsString = [result toSuccessCallbackString:callbackId];
+    NSLog(@"findCallback string: %@", jsString);
+	
 
 	if(addrBook){
 		CFRelease(addrBook);
@@ -378,8 +313,7 @@
 	
 	if(jsString){
 		[self writeJavascript:jsString];
-		//[webView stringByEvaluatingJavaScriptFromString:jsString];
-	}
+    }
 	return;
 	
 	
@@ -398,17 +332,17 @@
 	
 	ABAddressBookRef addrBook = ABAddressBookCreate();	
 	NSNumber* cId = [contactDict valueForKey:kW3ContactId];
-	Contact* aContact = nil; 
+	PGContact* aContact = nil; 
 	ABRecordRef rec = nil;
 	if (cId && ![cId isKindOfClass:[NSNull class]]){
 		rec = ABAddressBookGetPersonWithRecordID(addrBook, [cId intValue]);
 		if (rec){
-			aContact = [[Contact alloc] initFromABRecord: rec ];
+			aContact = [[PGContact alloc] initFromABRecord: rec ];
 			bUpdate = YES;
 		}
 	}
 	if (!aContact){
-		aContact = [[Contact alloc] init]; 			
+		aContact = [[PGContact alloc] init]; 			
 	}
 	
 	bSuccess = [aContact setFromContactDict: contactDict asUpdate: bUpdate];
@@ -427,9 +361,9 @@
 			// give original dictionary back?  If generate dictionary from saved contact, have no returnFields specified
 			// so would give back all fields (which W3C spec. indicates is not desired)
 			// for now (while testing) give back saved, full contact
-			NSDictionary* newContact = [aContact toDictionary: [Contact defaultFields]];
+			NSDictionary* newContact = [aContact toDictionary: [PGContact defaultFields]];
 			//NSString* contactStr = [newContact JSONRepresentation];
-			result = [PluginResult resultWithStatus:PGCommandStatus_OK messageAsDictionary: newContact cast: @"navigator.service.contacts._contactCallback" ];
+			result = [PluginResult resultWithStatus:PGCommandStatus_OK messageAsDictionary: newContact cast: @"navigator.contacts._contactCallback" ];
 			jsString = [result toSuccessCallbackString:callbackId];
 		}
 	} else {
@@ -440,9 +374,8 @@
 	CFRelease(addrBook);
 		
 	if (bIsError){
-		result = [PluginResult resultWithStatus:PGCommandStatus_ERROR messageAsInt: errCode cast:@"navigator.service.contacts._errCallback" ];
+		result = [PluginResult resultWithStatus:PGCommandStatus_ERROR messageAsInt: errCode cast:@"navigator.contacts._errCallback" ];
 		jsString = [result toErrorCallbackString:callbackId];
-		//jsString = [NSString stringWithFormat:@"%@(%d);", @"navigator.service.contacts._errCallback", errCode];
 	}
 	
 	if(jsString){
@@ -481,17 +414,15 @@
 				}else {
 					// set id to null
 					[contactDict setObject:[NSNull null] forKey:kW3ContactId];
-					//[result initWithStatus:PGCommandStatus_OK message: [contactDict JSONRepresentation] cast: @"navigator.service.contacts._contactCallback"];
-					result = [PluginResult resultWithStatus:PGCommandStatus_OK messageAsDictionary: contactDict cast: @"navigator.service.contacts._contactCallback"];
+					result = [PluginResult resultWithStatus:PGCommandStatus_OK messageAsDictionary: contactDict cast: @"navigator.contacts._contactCallback"];
 					jsString = [result toSuccessCallbackString:callbackId];
 					//NSString* contactStr = [contactDict JSONRepresentation];
-					//jsString = [NSString stringWithFormat: @"%@(%@);", @"navigator.service.contacts._contactCallback", contactStr];
 				}
 			}						
 		} else {
 			// no record found return error
 			bIsError = TRUE;
-			errCode = NOT_FOUND_ERROR;
+			errCode = UNKNOWN_ERROR;
 		}
 		
 	} else {
@@ -505,13 +436,11 @@
 		CFRelease(addrBook);
 	}
 	if (bIsError){
-		result = [PluginResult resultWithStatus:PGCommandStatus_ERROR messageAsInt: errCode cast: @"navigator.service.contacts._errCallback"];
+		result = [PluginResult resultWithStatus:PGCommandStatus_ERROR messageAsInt: errCode cast: @"navigator.contacts._errCallback"];
 		 jsString = [result toErrorCallbackString:callbackId];
-		 //jsString = [NSString stringWithFormat:@"%@(%d);", @"navigator.service.contacts._errCallback", errCode];
 	}
 	if (jsString){
 		[self writeJavascript:jsString];
-		//[webView stringByEvaluatingJavaScriptFromString:jsString];
 	}	
 		
 	return;

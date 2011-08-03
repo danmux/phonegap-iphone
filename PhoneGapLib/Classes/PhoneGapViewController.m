@@ -92,9 +92,13 @@
 			break;
 	}
 
-	NSString* jsCallback = [NSString stringWithFormat:@"window.__defineGetter__('orientation',function(){return %d;});var e = document.createEvent('Events'); e.initEvent('orientationchange', true, false); document.dispatchEvent(e); ",i];
+// DANX long winded 	NSString* jsCallback = [NSString stringWithFormat:@"window.__defineGetter__('orientation',function(){return %d;});var e = document.createEvent('Events'); e.initEvent('orientationchange', true, false); document.dispatchEvent(e); ",i];
     
-	[webView stringByEvaluatingJavaScriptFromString:jsCallback];
+    // master
+	NSString* jsCallback = [NSString stringWithFormat:@"window.__defineGetter__('orientation',function(){ return %d; }); PhoneGap.fireEvent('orientationchange', window);",i];
+
+	
+    [webView stringByEvaluatingJavaScriptFromString:jsCallback];
 	 
 }
 

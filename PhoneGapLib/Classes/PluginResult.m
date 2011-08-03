@@ -9,6 +9,7 @@
 
 #import "PluginResult.h"
 #import "JSON.h"
+#import "PGDebug.h"
 
 @interface PluginResult()
 
@@ -75,6 +76,10 @@ static NSArray* com_phonegap_CommandStatusMsgs;
 {
 	return [[[self alloc] initWithStatus: statusOrdinal message: [NSNumber numberWithInt: theMessage] cast:nil] autorelease];
 }
++(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageAsDouble: (double) theMessage
+{
+	return [[[self alloc] initWithStatus: statusOrdinal message: [NSNumber numberWithDouble: theMessage] cast:nil] autorelease];
+}
 
 +(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageAsDictionary: (NSDictionary*) theMessage
 {
@@ -93,9 +98,18 @@ static NSArray* com_phonegap_CommandStatusMsgs;
 {
 	return [[[self alloc] initWithStatus: statusOrdinal message: [NSNumber numberWithInt: theMessage] cast:theCast] autorelease];
 }
++(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageAsDouble: (double) theMessage cast: (NSString*) theCast
+{
+	return [[[self alloc] initWithStatus: statusOrdinal message: [NSNumber numberWithDouble: theMessage] cast:theCast] autorelease];
+}
 +(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageAsDictionary: (NSDictionary*) theMessage cast: (NSString*) theCast
 {
 	return [[[self alloc] initWithStatus: statusOrdinal message: theMessage cast:theCast] autorelease];
+}
++(PluginResult*) resultWithStatus: (PGCommandStatus) statusOrdinal messageToErrorObject: (int) errorCode 
+{
+    NSDictionary* errDict = [NSDictionary dictionaryWithObject:[NSNumber numberWithInt:errorCode] forKey:@"code"];
+	return [[[self alloc] initWithStatus: statusOrdinal message: errDict cast:nil] autorelease];
 }
 
 
@@ -105,13 +119,17 @@ static NSArray* com_phonegap_CommandStatusMsgs;
 }
 
 -(NSString*) toJSONString{
-	NSString* resultString;
+	NSString* resultString = @"";
 	// create the returned strings properly based on return type.  Assumes that non-strings are to be returned as objects
 	if ([self.message isKindOfClass: [NSNumber class]]) {
 		// return as number
-		resultString = [NSString stringWithFormat: @"{\"status\": %d, \"message\": %d,\"keepCallback\":%d}", 
+        if((strcmp([self.message objCType], @encode(int))) == 0) {
+            resultString = [NSString stringWithFormat: @"{\"status\": %d, \"message\": %d,\"keepCallback\":%d}", 
 							[self.status intValue], [self.message intValue], [self.keepCallback boolValue]];
-		
+        } else if((strcmp([self.message objCType], @encode(double))) == 0) {
+            resultString = [NSString stringWithFormat: @"{\"status\": %d, \"message\": %f,\"keepCallback\":%d}", 
+							[self.status intValue], [self.message doubleValue], [self.keepCallback boolValue]];
+        }
 	} else if ([self.message isKindOfClass:[NSArray class]]){
 		// return as array of strings
 		resultString = [NSString stringWithFormat: @"{\"status\": %d, \"message\": [%@],\"keepCallback\":%d}", 
@@ -127,7 +145,7 @@ static NSArray* com_phonegap_CommandStatusMsgs;
 					[self.status intValue], self.message, [self.keepCallback boolValue]];
 	}
 
-	//NSLog(@"PluginResult:toJSONString - %@", resultString);
+	DLog(@"PluginResult:toJSONString - %@", resultString);
 	return resultString;
 }
 -(NSString*) toSuccessCallbackString: (NSString*) callbackId
@@ -140,7 +158,7 @@ static NSArray* com_phonegap_CommandStatusMsgs;
 	else {
 		successCB = [NSString stringWithFormat:@"PhoneGap.callbackSuccess('%@',%@);", callbackId, [self toJSONString]];			
 	}
-	//NSLog(@"PluginResult toSuccessCallbackString: %@", successCB);
+	DLog(@"PluginResult toSuccessCallbackString: %@", successCB);
 	return successCB;
 }
 -(NSString*) toErrorCallbackString: (NSString*) callbackId
@@ -153,7 +171,7 @@ static NSArray* com_phonegap_CommandStatusMsgs;
 	else {
 		errorCB = [NSString stringWithFormat:@"PhoneGap.callbackError('%@',%@);", callbackId, [self toJSONString]];
 	}
-	//NSLog(@"PluginResult toErrorCallbackString: %@", errorCB);
+	DLog(@"PluginResult toErrorCallbackString: %@", errorCB);
 	return errorCB;
 }	
 										 

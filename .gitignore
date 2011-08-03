@@ -3,7 +3,16 @@
 *.cso
 tmp
 lib
-docs
-PhoneGapLibInstaller.pkg
+PhoneGapInstaller.pkg
 
 /PhoneGapLib/javascripts/phonegap-uncompressed.js
+*.mode1v3
+*.pbxuser
+build
+/PhoneGap.framework/
+/pkg_error_log
+*.xcworkspace
+xcuserdata
+/dist/
+/Markdown_1.0.1/
+Markdown_*.zip

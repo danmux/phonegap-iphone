@@ -1,51 +1,34 @@
 if (!PhoneGap.hasResource("network")) {
 	PhoneGap.addResource("network");
 
-/**
- * This class contains information about any NetworkStatus.
- * @constructor
- */
-NetworkStatus = function() {
-	this.code = null;
-	this.message = "";
-}
+// //////////////////////////////////////////////////////////////////
 
-NetworkStatus.NOT_REACHABLE = 0;
-NetworkStatus.REACHABLE_VIA_CARRIER_DATA_NETWORK = 1;
-NetworkStatus.REACHABLE_VIA_WIFI_NETWORK = 2;
+Connection = function() {
+	/*
+	 * One of the connection constants below.
+	 */
+	this.type = Connection.UNKNOWN;
 
-/**
- * This class provides access to device Network data (reachability).
- * @constructor
- */
-Network = function() {
-    /**
-     * The last known Network status.
-	 * { hostName: string, ipAddress: string, 
-		remoteHostStatus: int(0/1/2), internetConnectionStatus: int(0/1/2), localWiFiConnectionStatus: int (0/2) }
-     */
-	this.lastReachability = null;
+	/* initialize from the extended DeviceInfo properties */
+    try {      
+		this.type	= DeviceInfo.connection.type;
+    } 
+	catch(e) {
+    }
 };
 
-/**
- * 
- * @param {Function} successCallback
- * @param {Function} errorCallback
- * @param {Object} options (isIpAddress:boolean)
- */
-Network.prototype.isReachable = function(hostName, successCallback, options) {
-	PhoneGap.exec("Network.isReachable", hostName, GetFunctionName(successCallback), options);
-};
+Connection.UNKNOWN = "unknown"; // Unknown connection type
+Connection.ETHERNET = "ethernet";
+Connection.WIFI = "wifi";
+Connection.CELL_2G = "2g"; // the default for iOS, for any cellular connection
+Connection.CELL_3G = "3g";
+Connection.CELL_4G = "4g";
+Connection.NONE = "none"; // NO connectivity
 
-/**
- * Called by the geolocation framework when the reachability status has changed.
- * @param {Reachibility} reachability The current reachability status.
- */
-Network.prototype.updateReachability = function(reachability) {
-    this.lastReachability = reachability;
-};
 
 PhoneGap.addConstructor(function() {
-    if (typeof navigator.network == "undefined") navigator.network = new Network();
+    if (typeof navigator.network == "undefined") navigator.network = {};
+    if (typeof navigator.network.connection == "undefined") navigator.network.connection = new Connection();
 });
+
 };
